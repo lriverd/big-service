@@ -12,7 +12,6 @@ vendor/
 bin/
 dist/
 tmp/
-go.sum
 .env
 .env.*
 !.env.example
