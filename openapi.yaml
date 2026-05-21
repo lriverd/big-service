@@ -1,0 +1,1391 @@
+openapi: 3.0.3
+info:
+  title: PescaApp API
+  description: Backend RESTful para aplicación de pesca colaborativa
+  version: 1.0.0
+  contact:
+    name: PescaApp Backend
+
+servers:
+  - url: https://api.pescaapp.com/v1
+    description: Production
+  - url: http://localhost:8080/v1
+    description: Local
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    Pagination:
+      type: object
+      properties:
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        hasMore:
+          type: boolean
+
+    LoginRequest:
+      type: object
+      required: [idToken, email]
+      properties:
+        idToken:
+          type: string
+        email:
+          type: string
+          format: email
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/AuthUser'
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+
+    AuthUser:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        photoUrl:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        photoUrl:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum: [user, admin]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UserPublic:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        photoUrl:
+          type: string
+          nullable: true
+        stats:
+          $ref: '#/components/schemas/UserStats'
+
+    UserStats:
+      type: object
+      properties:
+        spotsCreated:
+          type: integer
+        commentsCount:
+          type: integer
+        ratingsCount:
+          type: integer
+        averageRating:
+          type: number
+          format: double
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        photoUrl:
+          type: string
+          nullable: true
+
+    Species:
+      type: object
+      properties:
+        id:
+          type: string
+        commonName:
+          type: string
+        scientificName:
+          type: string
+        description:
+          type: string
+        imageUrl:
+          type: string
+          nullable: true
+        habitat:
+          type: string
+        diet:
+          type: string
+        averageSizeCm:
+          type: number
+        averageWeightKg:
+          type: number
+        maxSizeCm:
+          type: number
+        maxWeightKg:
+          type: number
+        fishingTips:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateSpeciesRequest:
+      type: object
+      required: [commonName, scientificName, description]
+      properties:
+        commonName:
+          type: string
+        scientificName:
+          type: string
+        description:
+          type: string
+        imageUrl:
+          type: string
+          nullable: true
+        habitat:
+          type: string
+        diet:
+          type: string
+        averageSizeCm:
+          type: number
+        averageWeightKg:
+          type: number
+        maxSizeCm:
+          type: number
+        maxWeightKg:
+          type: number
+        fishingTips:
+          type: array
+          items:
+            type: string
+
+    Spot:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        region:
+          type: string
+        waterType:
+          type: string
+          enum: [river, lake, sea, lagoon]
+        boatAllowed:
+          type: boolean
+        boatRequired:
+          type: boolean
+        access:
+          type: string
+          enum: [easy, moderate, difficult, boatOnly]
+        createdByUserId:
+          type: string
+        views:
+          type: integer
+        averageRating:
+          type: number
+          format: double
+        totalRatings:
+          type: integer
+        totalComments:
+          type: integer
+        species:
+          type: array
+          items:
+            $ref: '#/components/schemas/SpotSpecies'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    SpotSpecies:
+      type: object
+      properties:
+        speciesId:
+          type: string
+        recommendedBaits:
+          type: array
+          items:
+            type: string
+        recommendedRod:
+          type: string
+        recommendedLine:
+          type: string
+        recommendedHook:
+          type: string
+        bestSeason:
+          type: string
+        difficulty:
+          type: string
+          enum: [easy, medium, hard]
+        notes:
+          type: string
+
+    CreateSpotRequest:
+      type: object
+      required: [name, description, latitude, longitude, region]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        region:
+          type: string
+        waterType:
+          type: string
+          enum: [river, lake, sea, lagoon]
+        boatAllowed:
+          type: boolean
+        boatRequired:
+          type: boolean
+        access:
+          type: string
+          enum: [easy, moderate, difficult, boatOnly]
+        species:
+          type: array
+          items:
+            $ref: '#/components/schemas/SpotSpecies'
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+        spotId:
+          type: string
+        userId:
+          type: string
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            photoUrl:
+              type: string
+              nullable: true
+        text:
+          type: string
+        likes:
+          type: integer
+        liked:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    CreateCommentRequest:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          minLength: 10
+          maxLength: 500
+
+    Rating:
+      type: object
+      properties:
+        id:
+          type: string
+        spotId:
+          type: string
+        userId:
+          type: string
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            photoUrl:
+              type: string
+              nullable: true
+        stars:
+          type: integer
+          minimum: 1
+          maximum: 5
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateRatingRequest:
+      type: object
+      required: [stars]
+      properties:
+        stars:
+          type: integer
+          minimum: 1
+          maximum: 5
+
+    RatingStats:
+      type: object
+      properties:
+        averageRating:
+          type: number
+          format: double
+        totalRatings:
+          type: integer
+        distribution:
+          type: object
+          additionalProperties:
+            type: integer
+
+    FavoriteSpot:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        region:
+          type: string
+        rating:
+          type: number
+          format: double
+        addedAt:
+          type: string
+          format: date-time
+
+    SearchResult:
+      type: object
+      properties:
+        spots:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              region:
+                type: string
+              rating:
+                type: number
+        species:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              commonName:
+                type: string
+              scientificName:
+                type: string
+        users:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+
+    SpotStats:
+      type: object
+      properties:
+        spotId:
+          type: string
+        name:
+          type: string
+        visits:
+          type: integer
+        uniqueUsers:
+          type: integer
+        averageRating:
+          type: number
+        totalRatings:
+          type: integer
+        totalComments:
+          type: integer
+        topSpecies:
+          type: array
+          items:
+            type: object
+            properties:
+              speciesId:
+                type: string
+              name:
+                type: string
+              mentions:
+                type: integer
+        lastCommentDate:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    UserDetailedStats:
+      type: object
+      properties:
+        userId:
+          type: string
+        name:
+          type: string
+        spotsCreated:
+          type: integer
+        commentsCount:
+          type: integer
+        ratingsCount:
+          type: integer
+        averageRating:
+          type: number
+        favoriteRegions:
+          type: array
+          items:
+            type: string
+        favoriteSpecies:
+          type: array
+          items:
+            type: string
+        joiningDate:
+          type: string
+          format: date-time
+
+    PopularSpot:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        region:
+          type: string
+        averageRating:
+          type: number
+        totalRatings:
+          type: integer
+        views:
+          type: integer
+        totalComments:
+          type: integer
+
+  parameters:
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 20
+        maximum: 100
+    OffsetParam:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        default: 0
+
+  responses:
+    Unauthorized:
+      description: Token inválido o expirado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Permiso denegado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    BadRequest:
+      description: Validación falló
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Autenticar usuario con Google
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '201':
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Cerrar sesión
+      operationId: logout
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logout exitoso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /users:
+    get:
+      tags: [Users]
+      summary: Listar usuarios
+      operationId: listUsers
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista de usuarios
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserPublic'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /users/{id}:
+    get:
+      tags: [Users]
+      summary: Obtener perfil de usuario
+      operationId: getUser
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Perfil de usuario
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Users]
+      summary: Actualizar perfil de usuario
+      operationId: updateUser
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: Usuario actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /users/{id}/favorites:
+    get:
+      tags: [Favorites]
+      summary: Listar favoritos del usuario
+      operationId: listFavorites
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Lista de favoritos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FavoriteSpot'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /users/{id}/favorites/{spotId}:
+    post:
+      tags: [Favorites]
+      summary: Agregar lugar a favoritos
+      operationId: addFavorite
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: spotId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Favorito agregado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  isFavorite:
+                    type: boolean
+                  addedAt:
+                    type: string
+                    format: date-time
+        '409':
+          description: Ya existe en favoritos
+    delete:
+      tags: [Favorites]
+      summary: Eliminar de favoritos
+      operationId: removeFavorite
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: spotId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Eliminado de favoritos
+
+  /species:
+    get:
+      tags: [Species]
+      summary: Listar especies
+      operationId: listSpecies
+      parameters:
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista de especies
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Species'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+    post:
+      tags: [Species]
+      summary: Crear especie (Admin)
+      operationId: createSpecies
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSpeciesRequest'
+      responses:
+        '201':
+          description: Especie creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Species'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /species/{id}:
+    get:
+      tags: [Species]
+      summary: Obtener especie por ID
+      operationId: getSpecies
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Detalle de especie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Species'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Species]
+      summary: Actualizar especie (Admin)
+      operationId: updateSpecies
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSpeciesRequest'
+      responses:
+        '200':
+          description: Especie actualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Species'
+    delete:
+      tags: [Species]
+      summary: Eliminar especie (Admin)
+      operationId: deleteSpecies
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Especie eliminada
+
+  /spots:
+    get:
+      tags: [Spots]
+      summary: Listar lugares de pesca
+      operationId: listSpots
+      parameters:
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+        - name: region
+          in: query
+          schema:
+            type: string
+        - name: waterType
+          in: query
+          schema:
+            type: string
+            enum: [river, lake, sea, lagoon]
+        - name: boatRequired
+          in: query
+          schema:
+            type: boolean
+        - name: latitude
+          in: query
+          schema:
+            type: number
+        - name: longitude
+          in: query
+          schema:
+            type: number
+        - name: radius
+          in: query
+          description: Radio en km
+          schema:
+            type: number
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [rating, recent, distance]
+      responses:
+        '200':
+          description: Lista de spots
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Spot'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+    post:
+      tags: [Spots]
+      summary: Crear lugar de pesca
+      operationId: createSpot
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSpotRequest'
+      responses:
+        '201':
+          description: Spot creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Spot'
+
+  /spots/{id}:
+    get:
+      tags: [Spots]
+      summary: Obtener detalle de un spot
+      operationId: getSpot
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Detalle del spot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Spot'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Spots]
+      summary: Actualizar spot
+      operationId: updateSpot
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSpotRequest'
+      responses:
+        '200':
+          description: Spot actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Spot'
+    delete:
+      tags: [Spots]
+      summary: Eliminar spot
+      operationId: deleteSpot
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Spot eliminado
+
+  /spots/{id}/nearby:
+    get:
+      tags: [Spots]
+      summary: Obtener spots cercanos
+      operationId: findNearbySpots
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: radiusKm
+          in: query
+          schema:
+            type: number
+            default: 10
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Spots cercanos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Spot'
+
+  /spots/{id}/comments:
+    get:
+      tags: [Comments]
+      summary: Listar comentarios de un spot
+      operationId: listComments
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [recent, oldest, helpful]
+      responses:
+        '200':
+          description: Lista de comentarios
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Comment'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+    post:
+      tags: [Comments]
+      summary: Crear comentario
+      operationId: createComment
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCommentRequest'
+      responses:
+        '201':
+          description: Comentario creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+
+  /comments/{commentId}:
+    put:
+      tags: [Comments]
+      summary: Editar comentario
+      operationId: updateComment
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCommentRequest'
+      responses:
+        '200':
+          description: Comentario actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+    delete:
+      tags: [Comments]
+      summary: Eliminar comentario
+      operationId: deleteComment
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Comentario eliminado
+
+  /comments/{commentId}/like:
+    post:
+      tags: [Comments]
+      summary: Dar like a comentario
+      operationId: likeComment
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Like agregado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  likes:
+                    type: integer
+                  liked:
+                    type: boolean
+    delete:
+      tags: [Comments]
+      summary: Quitar like de comentario
+      operationId: unlikeComment
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Like removido
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  likes:
+                    type: integer
+                  liked:
+                    type: boolean
+
+  /spots/{id}/ratings:
+    get:
+      tags: [Ratings]
+      summary: Listar valoraciones de un spot
+      operationId: listRatings
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Valoraciones con estadísticas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Rating'
+                  stats:
+                    $ref: '#/components/schemas/RatingStats'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+    post:
+      tags: [Ratings]
+      summary: Crear o actualizar valoración
+      operationId: createOrUpdateRating
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRatingRequest'
+      responses:
+        '201':
+          description: Valoración creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rating'
+        '200':
+          description: Valoración actualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rating'
+    delete:
+      tags: [Ratings]
+      summary: Eliminar valoración
+      operationId: deleteRating
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Valoración eliminada
+
+  /search:
+    get:
+      tags: [Search]
+      summary: Búsqueda global
+      operationId: globalSearch
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [spot, species, user, all]
+            default: all
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Resultados de búsqueda
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    $ref: '#/components/schemas/SearchResult'
+
+  /spots/{id}/stats:
+    get:
+      tags: [Statistics]
+      summary: Estadísticas de un spot
+      operationId: getSpotStats
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Estadísticas del spot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpotStats'
+
+  /user/{userId}/stats:
+    get:
+      tags: [Statistics]
+      summary: Estadísticas de usuario
+      operationId: getUserStats
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Estadísticas del usuario
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetailedStats'
+
+  /statistics/popular-spots:
+    get:
+      tags: [Statistics]
+      summary: Spots más populares
+      operationId: getPopularSpots
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: timeRange
+          in: query
+          schema:
+            type: string
+            enum: [week, month, year, all]
+        - name: orderBy
+          in: query
+          schema:
+            type: string
+            enum: [rating, visits, comments]
+            default: rating
+      responses:
+        '200':
+          description: Spots populares
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PopularSpot'
+
