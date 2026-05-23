@@ -83,7 +83,7 @@ func main() {
 	ratingRepo := ratingsInfra.NewRatingRepository(fbClient.Firestore)
 
 	// ========== ADAPTERS ==========
-	googleValidator := authInfra.NewGoogleTokenValidator(fbClient.Auth)
+	googleValidator := authInfra.NewGoogleTokenValidator(fbClient.Auth, cfg.GoogleClientID)
 	userInfoAdapter := commentsInfra.NewUserInfoAdapter(userRepo)
 
 	// ========== SERVICES ==========

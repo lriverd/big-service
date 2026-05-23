@@ -15,6 +15,7 @@ type Config struct {
 	Environment       string
 	LogLevel          string
 	RateLimitPerMin   int
+	GoogleClientID    string
 }
 
 func Load() *Config {
@@ -28,6 +29,7 @@ func Load() *Config {
 		Environment:       getEnv("ENVIRONMENT", "development"),
 		LogLevel:          getEnv("LOG_LEVEL", "info"),
 		RateLimitPerMin:   getEnvInt("RATE_LIMIT_PER_MIN", 100),
+		GoogleClientID:    getEnv("GOOGLE_CLIENT_ID", ""),
 	}
 }
 
