@@ -90,7 +90,7 @@ func main() {
 	userService := usersApp.NewUserService(userRepo, appCache)
 	spotService := spotsApp.NewSpotService(spotRepo, spotSpeciesRepo, appCache)
 	favService := usersApp.NewFavoriteService(favRepo, spotService)
-	authService := authApp.NewAuthService(googleValidator, userRepo, cfg.JWTSecret, cfg.JWTExpiryMinutes)
+	authService := authApp.NewAuthService(googleValidator, userRepo, cfg.JWTSecret, cfg.JWTExpiryMinutes, cfg.RegistrationEnabled)
 	speciesService := speciesApp.NewSpeciesService(speciesRepo, appCache)
 	commentService := commentsApp.NewCommentService(commentRepo, likeRepo, userInfoAdapter, spotRepo)
 	ratingService := ratingsApp.NewRatingService(ratingRepo, spotRepo)

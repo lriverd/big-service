@@ -13,6 +13,8 @@ type Spot struct {
 	BoatAllowed     bool          `json:"boatAllowed" firestore:"boatAllowed"`
 	BoatRequired    bool          `json:"boatRequired" firestore:"boatRequired"`
 	Access          string        `json:"access" firestore:"access"`
+	IsFree          bool          `json:"isFree" firestore:"isFree"`
+	EntryFee        *float64      `json:"entryFee,omitempty" firestore:"entryFee,omitempty"`
 	CreatedByUserID string        `json:"createdByUserId" firestore:"createdByUserId"`
 	Views           int           `json:"views" firestore:"views"`
 	AverageRating   float64       `json:"averageRating" firestore:"averageRating"`
@@ -46,6 +48,8 @@ type CreateSpotRequest struct {
 	BoatAllowed  bool          `json:"boatAllowed"`
 	BoatRequired bool          `json:"boatRequired"`
 	Access       string        `json:"access"`
+	IsFree       bool          `json:"isFree"`
+	EntryFee     *float64      `json:"entryFee,omitempty"`
 	Species      []SpotSpecies `json:"species"`
 }
 
@@ -59,6 +63,8 @@ type UpdateSpotRequest struct {
 	BoatAllowed  *bool         `json:"boatAllowed"`
 	BoatRequired *bool         `json:"boatRequired"`
 	Access       *string       `json:"access"`
+	IsFree       *bool         `json:"isFree"`
+	EntryFee     *float64      `json:"entryFee"`
 	Species      []SpotSpecies `json:"species"`
 }
 

@@ -68,6 +68,8 @@ func (s *SpotService) Create(ctx context.Context, req domain.CreateSpotRequest, 
 		BoatAllowed:     req.BoatAllowed,
 		BoatRequired:    req.BoatRequired,
 		Access:          req.Access,
+		IsFree:          req.IsFree,
+		EntryFee:        req.EntryFee,
 		CreatedByUserID: userID,
 	}
 

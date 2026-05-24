@@ -9,6 +9,8 @@ func RegisterRoutes(rg *gin.RouterGroup, handler *AuthHandler, authMw *middlewar
 	auth := rg.Group("/auth")
 	{
 		auth.POST("/login", handler.Login)
+		auth.POST("/login/password", handler.LoginWithPassword)
+		auth.POST("/register", handler.Register)
 		auth.POST("/logout", authMw.RequireAuth(), handler.Logout)
 	}
 }

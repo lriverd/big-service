@@ -39,3 +39,11 @@ func Forbidden(message string) *AppError {
 	return &AppError{Status: 403, Code: "FORBIDDEN", Message: message}
 }
 
+func Unauthorized(message string) *AppError {
+	return &AppError{Status: 401, Code: "UNAUTHORIZED", Message: message}
+}
+
+func Conflict(message string) *AppError {
+	return &AppError{Status: 409, Code: "CONFLICT", Message: message}
+}
+
