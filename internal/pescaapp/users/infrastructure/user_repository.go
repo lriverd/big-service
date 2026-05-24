@@ -62,14 +62,19 @@ func (r *UserFirestoreRepository) Create(ctx context.Context, user *domain.User)
 		user.Role = "user"
 	}
 
-	ref, _, err := r.client.Collection(r.collection).Add(ctx, map[string]interface{}{
+	data := map[string]interface{}{
 		"email":     user.Email,
 		"name":      user.Name,
 		"photoUrl":  user.PhotoURL,
 		"role":      user.Role,
 		"createdAt": user.CreatedAt,
 		"updatedAt": user.UpdatedAt,
-	})
+	}
+	if user.PasswordHash != "" {
+		data["passwordHash"] = user.PasswordHash
+	}
+
+	ref, _, err := r.client.Collection(r.collection).Add(ctx, data)
 	if err != nil {
 		return nil, err
 	}
