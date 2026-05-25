@@ -118,6 +118,7 @@ func main() {
 	authMw := middleware.NewAuthMiddleware(cfg)
 	rateLimiter := middleware.NewRateLimiter(appCache, cfg.RateLimitPerMin)
 
+	r.Use(gin.Logger())
 	r.Use(middleware.Recovery())
 	r.Use(middleware.ErrorHandler())
 	r.Use(middleware.CORSMiddleware(cfg.AllowedOrigins))
