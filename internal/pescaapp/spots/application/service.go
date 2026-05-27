@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/lriverd/big-service/internal/pescaapp/spots/domain"
@@ -57,7 +58,9 @@ func (s *SpotService) GetByID(ctx context.Context, id string) (*domain.Spot, err
 	return spot, nil
 }
 
-func (s *SpotService) Create(ctx context.Context, req domain.CreateSpotRequest, userID string) (*domain.Spot, error) {
+func (s *SpotService) Create(ctx context.Context, req domain.CreateSpotRequest, userID, userEmail, userName string) (*domain.Spot, error) {
+	shortName := strings.Split(userName, " ")[0]
+
 	spot := &domain.Spot{
 		Name:            req.Name,
 		Description:     req.Description,
@@ -71,6 +74,8 @@ func (s *SpotService) Create(ctx context.Context, req domain.CreateSpotRequest, 
 		IsFree:          req.IsFree,
 		EntryFee:        req.EntryFee,
 		CreatedByUserID: userID,
+		CreatedByEmail:  userEmail,
+		CreatedByName:   shortName,
 	}
 
 	created, err := s.spotRepo.Create(ctx, spot)
@@ -163,4 +168,3 @@ func (s *SpotService) GetSpotBasicInfo(ctx context.Context, spotID string) (*use
 func (s *SpotService) Search(ctx context.Context, query string, limit int) ([]*domain.Spot, error) {
 	return s.spotRepo.Search(ctx, query, limit)
 }
-

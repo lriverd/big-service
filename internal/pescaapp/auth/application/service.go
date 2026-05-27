@@ -123,7 +123,7 @@ func (s *AuthServiceImpl) Register(ctx context.Context, req authDomain.RegisterR
 }
 
 func (s *AuthServiceImpl) buildAuthResponse(user *userDomain.User) (*authDomain.AuthResponse, error) {
-	accessToken, err := middleware.GenerateJWT(user.ID, user.Email, user.Role, s.jwtSecret, s.jwtExpiry)
+	accessToken, err := middleware.GenerateJWT(user.ID, user.Email, user.Role, user.Name, s.jwtSecret, s.jwtExpiry)
 	if err != nil {
 		return nil, err
 	}

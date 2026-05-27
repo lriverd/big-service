@@ -16,6 +16,8 @@ type Spot struct {
 	IsFree          bool          `json:"isFree" firestore:"isFree"`
 	EntryFee        *float64      `json:"entryFee,omitempty" firestore:"entryFee,omitempty"`
 	CreatedByUserID string        `json:"createdByUserId" firestore:"createdByUserId"`
+	CreatedByEmail  string        `json:"-" firestore:"createdByEmail"`
+	CreatedByName   string        `json:"createdByName" firestore:"createdByName"`
 	Views           int           `json:"views" firestore:"views"`
 	AverageRating   float64       `json:"averageRating" firestore:"averageRating"`
 	TotalRatings    int           `json:"totalRatings" firestore:"totalRatings"`
@@ -77,4 +79,3 @@ type SpotFilter struct {
 	RadiusKm     *float64
 	SortBy       string
 }
-

@@ -56,6 +56,7 @@ func (m *AuthMiddleware) RequireAuth() gin.HandlerFunc {
 		c.Set("userID", claims.UserID)
 		c.Set("userEmail", claims.Email)
 		c.Set("userRole", claims.Role)
+		c.Set("userName", claims.Name)
 		c.Next()
 	}
 }
@@ -75,4 +76,3 @@ func RequireAdmin() gin.HandlerFunc {
 		c.Next()
 	}
 }
-

@@ -77,7 +77,20 @@ func (h *SpotHandler) Create(c *gin.Context) {
 		return
 	}
 	userID, _ := c.Get("userID")
-	spot, err := h.service.Create(c.Request.Context(), req, userID.(string))
+
+	userEmail, _ := c.Get("userEmail")
+	userName, _ := c.Get("userName")
+
+	email := ""
+	if userEmail != nil {
+		email = userEmail.(string)
+	}
+	name := ""
+	if userName != nil {
+		name = userName.(string)
+	}
+
+	spot, err := h.service.Create(c.Request.Context(), req, userID.(string), email, name)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create spot")
 		return
@@ -148,4 +161,3 @@ func (h *SpotHandler) FindNearby(c *gin.Context) {
 	}
 	response.Success(c, gin.H{"data": spots})
 }
-
