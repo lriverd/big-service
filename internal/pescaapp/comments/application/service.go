@@ -64,6 +64,11 @@ func (s *CommentService) Create(ctx context.Context, spotID, userID, text string
 		return nil, err
 	}
 
+	// Populate user info so the caller gets a complete response immediately
+	if userInfo, err := s.userProvider.GetUserInfo(ctx, userID); err == nil {
+		created.User = userInfo
+	}
+
 	_ = s.spotRepo.UpdateCommentCount(ctx, spotID, 1)
 	log.WithFields(log.Fields{"spotId": spotID, "commentId": created.ID}).Info("Comment created")
 	return created, nil
@@ -123,6 +128,20 @@ func (s *CommentService) Like(ctx context.Context, commentID, userID string) (in
 }
 
 func (s *CommentService) Unlike(ctx context.Context, commentID, userID string) (int, bool, error) {
+	exists, err := s.likeRepo.Exists(ctx, commentID, userID)
+	if err != nil {
+		return 0, false, err
+	}
+	if !exists {
+		// Return current count without modifying anything
+		comment, _ := s.commentRepo.FindByID(ctx, commentID)
+		likes := 0
+		if comment != nil {
+			likes = comment.Likes
+		}
+		return likes, false, nil
+	}
+
 	if err := s.likeRepo.Delete(ctx, commentID, userID); err != nil {
 		return 0, false, err
 	}

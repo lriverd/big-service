@@ -3,14 +3,15 @@ package domain
 import "time"
 
 type User struct {
-	ID           string    `json:"id" firestore:"-"`
-	Email        string    `json:"email" firestore:"email"`
-	Name         string    `json:"name" firestore:"name"`
-	PhotoURL     *string   `json:"photoUrl" firestore:"photoUrl"`
-	Role         string    `json:"role,omitempty" firestore:"role"`
-	PasswordHash string    `json:"-" firestore:"passwordHash"`
-	CreatedAt    time.Time `json:"createdAt" firestore:"createdAt"`
-	UpdatedAt    time.Time `json:"updatedAt" firestore:"updatedAt"`
+	ID           string     `json:"id" firestore:"-"`
+	Email        string     `json:"email" firestore:"email"`
+	Name         string     `json:"name" firestore:"name"`
+	PhotoURL     *string    `json:"photoUrl" firestore:"photoUrl"`
+	Role         string     `json:"role,omitempty" firestore:"role"`
+	PasswordHash string     `json:"-" firestore:"passwordHash"`
+	CreatedAt    time.Time  `json:"createdAt" firestore:"createdAt"`
+	UpdatedAt    time.Time  `json:"updatedAt" firestore:"updatedAt"`
+	LastLoginAt  *time.Time `json:"lastLoginAt,omitempty" firestore:"lastLoginAt"`
 }
 
 type UserPublic struct {

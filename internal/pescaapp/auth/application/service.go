@@ -3,7 +3,9 @@ package application
 import (
 	"context"
 	"fmt"
+	"time"
 
+	fbAuth "firebase.google.com/go/v4/auth"
 	authDomain "github.com/lriverd/big-service/internal/pescaapp/auth/domain"
 	userDomain "github.com/lriverd/big-service/internal/pescaapp/users/domain"
 	"github.com/lriverd/big-service/internal/platform/middleware"
@@ -15,6 +17,7 @@ import (
 type AuthServiceImpl struct {
 	tokenValidator      authDomain.TokenValidator
 	userRepo            userDomain.UserRepository
+	firebaseAuth        *fbAuth.Client
 	jwtSecret           string
 	jwtExpiry           int
 	registrationEnabled bool
@@ -23,6 +26,7 @@ type AuthServiceImpl struct {
 func NewAuthService(
 	tv authDomain.TokenValidator,
 	userRepo userDomain.UserRepository,
+	firebaseAuth *fbAuth.Client,
 	jwtSecret string,
 	jwtExpiry int,
 	registrationEnabled bool,
@@ -30,6 +34,7 @@ func NewAuthService(
 	return &AuthServiceImpl{
 		tokenValidator:      tv,
 		userRepo:            userRepo,
+		firebaseAuth:        firebaseAuth,
 		jwtSecret:           jwtSecret,
 		jwtExpiry:           jwtExpiry,
 		registrationEnabled: registrationEnabled,
@@ -60,8 +65,10 @@ func (s *AuthServiceImpl) Login(ctx context.Context, req authDomain.LoginRequest
 			return nil, err
 		}
 		log.WithField("userId", user.ID).Info("New user created via Google login")
+		s.syncFirebaseAuthUser(ctx, user.Email, user.Name, user.PhotoURL, "")
 	}
 
+	s.recordLastLogin(ctx, user.ID)
 	return s.buildAuthResponse(user)
 }
 
@@ -80,6 +87,7 @@ func (s *AuthServiceImpl) LoginWithPassword(ctx context.Context, req authDomain.
 		return nil, apperrors.Unauthorized("Invalid email or password")
 	}
 
+	s.recordLastLogin(ctx, user.ID)
 	return s.buildAuthResponse(user)
 }
 
@@ -108,6 +116,8 @@ func (s *AuthServiceImpl) Register(ctx context.Context, req authDomain.RegisterR
 		return nil, err
 	}
 
+	s.syncFirebaseAuthUser(ctx, user.Email, user.Name, nil, req.Password)
+	s.recordLastLogin(ctx, user.ID)
 	log.WithField("userId", user.ID).Info("New user registered with email/password")
 	return s.buildAuthResponse(user)
 }
@@ -134,3 +144,41 @@ func (s *AuthServiceImpl) buildAuthResponse(user *userDomain.User) (*authDomain.
 	}, nil
 }
 
+// recordLastLogin updates lastLoginAt in Firestore (non-blocking, best-effort).
+func (s *AuthServiceImpl) recordLastLogin(ctx context.Context, userID string) {
+	now := time.Now().UTC()
+	if err := s.userRepo.UpdateLastLoginAt(ctx, userID, now); err != nil {
+		log.WithError(err).WithField("userId", userID).Warn("Failed to update lastLoginAt")
+	}
+}
+
+// syncFirebaseAuthUser creates the user in Firebase Authentication if they don't exist yet,
+// so they appear in the Firebase console. Failures are non-blocking (best-effort).
+func (s *AuthServiceImpl) syncFirebaseAuthUser(ctx context.Context, email, name string, photoURL *string, password string) {
+	if s.firebaseAuth == nil {
+		return
+	}
+	// Check if already exists
+	if _, err := s.firebaseAuth.GetUserByEmail(ctx, email); err == nil {
+		return // already exists
+	}
+
+	params := (&fbAuth.UserToCreate{}).
+		Email(email).
+		DisplayName(name).
+		EmailVerified(false)
+
+	if photoURL != nil && *photoURL != "" {
+		params = params.PhotoURL(*photoURL)
+	}
+	if password != "" {
+		params = params.Password(password)
+	}
+
+	u, err := s.firebaseAuth.CreateUser(ctx, params)
+	if err != nil {
+		log.WithError(err).WithField("email", email).Warn("Failed to sync user to Firebase Auth")
+		return
+	}
+	log.WithField("firebaseUID", u.UID).WithField("email", email).Info("User synced to Firebase Auth")
+}

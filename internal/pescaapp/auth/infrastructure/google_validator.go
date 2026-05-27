@@ -6,6 +6,7 @@ import (
 
 	authDomain "github.com/lriverd/big-service/internal/pescaapp/auth/domain"
 	"firebase.google.com/go/v4/auth"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/api/idtoken"
 )
 
@@ -34,14 +35,16 @@ func (v *GoogleTokenValidator) ValidateGoogleToken(ctx context.Context, token st
 		return claims, nil
 	}
 
-	// Fallback: validate as Google OAuth ID token
+	log.WithError(err).Debug("Firebase VerifyIDToken failed, trying Google idtoken fallback")
+
+	// Fallback: validate as Google OAuth ID token (sent by google_sign_in with serverClientId)
 	if v.googleClientID == "" {
-		return nil, fmt.Errorf("firebase token invalid and no Google client ID configured: %w", err)
+		return nil, fmt.Errorf("firebase token invalid and GOOGLE_CLIENT_ID is not configured: %w", err)
 	}
 
 	payload, gErr := idtoken.Validate(ctx, token, v.googleClientID)
 	if gErr != nil {
-		return nil, fmt.Errorf("google token validation failed: %w", gErr)
+		return nil, fmt.Errorf("google idtoken validation failed (check GOOGLE_CLIENT_ID matches serverClientId in app): %w", gErr)
 	}
 
 	claims := &authDomain.GoogleClaims{}

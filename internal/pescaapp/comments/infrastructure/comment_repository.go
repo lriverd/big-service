@@ -6,7 +6,6 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"github.com/lriverd/big-service/internal/pescaapp/comments/domain"
-	"google.golang.org/api/iterator"
 )
 
 type CommentFirestoreRepository struct {
@@ -32,9 +31,10 @@ func (r *CommentFirestoreRepository) FindByID(ctx context.Context, id string) (*
 }
 
 func (r *CommentFirestoreRepository) ListBySpot(ctx context.Context, spotID string, limit, offset int, sortBy string) ([]*domain.Comment, int, error) {
+	// Query only by spotId + order — no deletedAt filter to avoid needing a composite index.
+	// Soft-deleted comments are filtered in memory.
 	query := r.client.Collection(r.collection).
-		Where("spotId", "==", spotID).
-		Where("deletedAt", "==", nil)
+		Where("spotId", "==", spotID)
 
 	switch sortBy {
 	case "oldest":
@@ -49,26 +49,31 @@ func (r *CommentFirestoreRepository) ListBySpot(ctx context.Context, spotID stri
 	if err != nil {
 		return nil, 0, err
 	}
-	total := len(all)
 
-	iter := query.Offset(offset).Limit(limit).Documents(ctx)
-	var comments []*domain.Comment
-	for {
-		doc, err := iter.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return nil, 0, err
-		}
+	// Decode and filter deleted in one pass
+	var active []*domain.Comment
+	for _, doc := range all {
 		var c domain.Comment
 		if err := doc.DataTo(&c); err != nil {
 			continue
 		}
+		if c.DeletedAt != nil {
+			continue
+		}
 		c.ID = doc.Ref.ID
-		comments = append(comments, &c)
+		active = append(active, &c)
 	}
-	return comments, total, nil
+	total := len(active)
+
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	var page []*domain.Comment
+	if offset < total {
+		page = active[offset:end]
+	}
+	return page, total, nil
 }
 
 func (r *CommentFirestoreRepository) Create(ctx context.Context, comment *domain.Comment) (*domain.Comment, error) {

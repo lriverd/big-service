@@ -82,6 +82,13 @@ func (r *UserFirestoreRepository) Create(ctx context.Context, user *domain.User)
 	return user, nil
 }
 
+func (r *UserFirestoreRepository) UpdateLastLoginAt(ctx context.Context, id string, t time.Time) error {
+	_, err := r.client.Collection(r.collection).Doc(id).Update(ctx, []firestore.Update{
+		{Path: "lastLoginAt", Value: t},
+	})
+	return err
+}
+
 func (r *UserFirestoreRepository) Update(ctx context.Context, id string, req domain.UpdateUserRequest) (*domain.User, error) {
 	updates := []firestore.Update{
 		{Path: "updatedAt", Value: time.Now().UTC()},

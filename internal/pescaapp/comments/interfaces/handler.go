@@ -9,6 +9,7 @@ import (
 	apperrors "github.com/lriverd/big-service/internal/shared/errors"
 	"github.com/lriverd/big-service/internal/shared/pagination"
 	"github.com/lriverd/big-service/internal/shared/response"
+	log "github.com/sirupsen/logrus"
 )
 
 type CommentHandler struct {
@@ -31,6 +32,7 @@ func (h *CommentHandler) ListBySpot(c *gin.Context) {
 
 	comments, total, err := h.service.ListBySpot(c.Request.Context(), spotID, p.Limit, p.Offset, sortBy, uid)
 	if err != nil {
+		log.WithError(err).WithField("spotId", spotID).Error("Failed to list comments")
 		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list comments")
 		return
 	}
@@ -47,6 +49,7 @@ func (h *CommentHandler) Create(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	comment, err := h.service.Create(c.Request.Context(), spotID, userID.(string), req.Text)
 	if err != nil {
+		log.WithError(err).WithField("spotId", spotID).Error("Failed to create comment")
 		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create comment")
 		return
 	}
@@ -108,6 +111,10 @@ func (h *CommentHandler) Unlike(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	likes, liked, err := h.service.Unlike(c.Request.Context(), commentID, userID.(string))
 	if err != nil {
+		if appErr, ok := err.(*apperrors.AppError); ok {
+			response.Error(c, appErr.Status, appErr.Code, appErr.Message)
+			return
+		}
 		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to unlike comment")
 		return
 	}

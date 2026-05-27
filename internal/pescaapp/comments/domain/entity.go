@@ -29,10 +29,10 @@ type CommentLike struct {
 }
 
 type CreateCommentRequest struct {
-	Text string `json:"text" binding:"required,min=10,max=500"`
+	Text string `json:"text" binding:"required,min=1,max=500"`
 }
 
 type UpdateCommentRequest struct {
-	Text string `json:"text" binding:"required,min=10,max=500"`
+	Text string `json:"text" binding:"required,min=1,max=500"`
 }
 
