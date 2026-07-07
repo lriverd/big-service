@@ -50,7 +50,7 @@ func (h *SpotHandler) List(c *gin.Context) {
 
 	spots, total, err := h.service.List(c.Request.Context(), p.Limit, p.Offset, filter)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list spots")
+		response.InternalError(c, err, "Failed to list spots")
 		return
 	}
 	response.Paginated(c, spots, total, p.Limit, p.Offset)
@@ -64,7 +64,7 @@ func (h *SpotHandler) GetByID(c *gin.Context) {
 			response.Error(c, appErr.Status, appErr.Code, appErr.Message)
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get spot")
+		response.InternalError(c, err, "Failed to get spot")
 		return
 	}
 	response.Success(c, spot)
@@ -92,7 +92,17 @@ func (h *SpotHandler) Create(c *gin.Context) {
 
 	spot, err := h.service.Create(c.Request.Context(), req, userID.(string), email, name)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create spot")
+		if dupErr, ok := err.(*domain.DuplicateCandidatesError); ok {
+			response.ErrorWithPayload(c, http.StatusConflict, "TOO_CLOSE_TO_EXISTING_SPOT",
+				"Ya existe un spot a menos de la distancia mínima permitida de esta ubicación. Elige un punto distinto.",
+				dupErr.Candidates)
+			return
+		}
+		if appErr, ok := err.(*apperrors.AppError); ok {
+			response.Error(c, appErr.Status, appErr.Code, appErr.Message)
+			return
+		}
+		response.InternalError(c, err, "Failed to create spot")
 		return
 	}
 	response.Created(c, spot)
@@ -113,7 +123,7 @@ func (h *SpotHandler) Update(c *gin.Context) {
 			response.Error(c, appErr.Status, appErr.Code, appErr.Message)
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update spot")
+		response.InternalError(c, err, "Failed to update spot")
 		return
 	}
 	response.Success(c, spot)
@@ -128,10 +138,71 @@ func (h *SpotHandler) Delete(c *gin.Context) {
 			response.Error(c, appErr.Status, appErr.Code, appErr.Message)
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete spot")
+		response.InternalError(c, err, "Failed to delete spot")
 		return
 	}
 	response.NoContent(c)
+}
+
+func (h *SpotHandler) UpdateStatus(c *gin.Context) {
+	id := c.Param("id")
+	var req domain.UpdateSpotStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "BAD_REQUEST", "Invalid request body")
+		return
+	}
+	switch req.Status {
+	case domain.SpotStatusVerified, domain.SpotStatusHidden, domain.SpotStatusDeleted:
+	default:
+		response.Error(c, http.StatusBadRequest, "BAD_REQUEST", "status must be one of VERIFIED, HIDDEN, DELETED")
+		return
+	}
+
+	spot, err := h.service.UpdateStatusByAdmin(c.Request.Context(), id, req.Status, req.Reason)
+	if err != nil {
+		if appErr, ok := err.(*apperrors.AppError); ok {
+			response.Error(c, appErr.Status, appErr.Code, appErr.Message)
+			return
+		}
+		response.InternalError(c, err, "Failed to update spot status")
+		return
+	}
+	response.Success(c, spot)
+}
+
+func (h *SpotHandler) NearbyDuplicates(c *gin.Context) {
+	lat, latErr := strconv.ParseFloat(c.Query("lat"), 64)
+	lng, lngErr := strconv.ParseFloat(c.Query("lng"), 64)
+	if latErr != nil || lngErr != nil {
+		response.Error(c, http.StatusBadRequest, "BAD_REQUEST", "lat and lng query parameters are required")
+		return
+	}
+
+	var radiusOverride *float64
+	if r := c.Query("radius"); r != "" {
+		if v, err := strconv.ParseFloat(r, 64); err == nil {
+			radiusOverride = &v
+		}
+	}
+
+	candidates, err := h.service.FindDuplicateCandidates(c.Request.Context(), lat, lng, radiusOverride)
+	if err != nil {
+		response.InternalError(c, err, "Failed to search for nearby duplicates")
+		return
+	}
+	response.Success(c, gin.H{"data": candidates})
+}
+
+func (h *SpotHandler) Mine(c *gin.Context) {
+	p := pagination.Parse(c)
+	userID, _ := c.Get("userID")
+
+	spots, total, err := h.service.Mine(c.Request.Context(), userID.(string), p.Limit, p.Offset)
+	if err != nil {
+		response.InternalError(c, err, "Failed to list your spots")
+		return
+	}
+	response.Paginated(c, spots, total, p.Limit, p.Offset)
 }
 
 func (h *SpotHandler) FindNearby(c *gin.Context) {
@@ -156,7 +227,7 @@ func (h *SpotHandler) FindNearby(c *gin.Context) {
 			response.Error(c, appErr.Status, appErr.Code, appErr.Message)
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to find nearby spots")
+		response.InternalError(c, err, "Failed to find nearby spots")
 		return
 	}
 	response.Success(c, gin.H{"data": spots})

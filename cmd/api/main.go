@@ -52,6 +52,17 @@ import (
 	// Statistics
 	statsApp "github.com/lriverd/big-service/internal/pescaapp/statistics/application"
 	statsIface "github.com/lriverd/big-service/internal/pescaapp/statistics/interfaces"
+
+	// Moderation
+	moderationApp "github.com/lriverd/big-service/internal/pescaapp/moderation/application"
+	moderationInfra "github.com/lriverd/big-service/internal/pescaapp/moderation/infrastructure"
+	moderationIface "github.com/lriverd/big-service/internal/pescaapp/moderation/interfaces"
+
+	// Reputation
+	reputationApp "github.com/lriverd/big-service/internal/pescaapp/reputation/application"
+	reputationInfra "github.com/lriverd/big-service/internal/pescaapp/reputation/infrastructure"
+	reputationIface "github.com/lriverd/big-service/internal/pescaapp/reputation/interfaces"
+	spotsDomain "github.com/lriverd/big-service/internal/pescaapp/spots/domain"
 )
 
 func main() {
@@ -81,6 +92,9 @@ func main() {
 	commentRepo := commentsInfra.NewCommentRepository(fbClient.Firestore)
 	likeRepo := commentsInfra.NewCommentLikeRepository(fbClient.Firestore)
 	ratingRepo := ratingsInfra.NewRatingRepository(fbClient.Firestore)
+	reportRepo := moderationInfra.NewReportRepository(fbClient.Firestore)
+	reputationRepo := reputationInfra.NewReputationRepository(fbClient.Firestore)
+	penaltyRepo := reputationInfra.NewPenaltyRepository(fbClient.Firestore)
 
 	// ========== ADAPTERS ==========
 	googleValidator := authInfra.NewGoogleTokenValidator(fbClient.Auth, cfg.GoogleClientID)
@@ -88,14 +102,29 @@ func main() {
 
 	// ========== SERVICES ==========
 	userService := usersApp.NewUserService(userRepo, appCache)
-	spotService := spotsApp.NewSpotService(spotRepo, spotSpeciesRepo, appCache)
+	penaltyEvaluator := reputationApp.NewPenaltyEvaluator(
+		reputationRepo, userService, penaltyRepo, userService,
+		cfg.PenaltyRejectedContentRateThreshold,
+		cfg.PenaltyRejectedContentMinSampleSize,
+		cfg.ReputationDeltaRejectedContentPenalty,
+		cfg.PenaltyDailyLimitReducedValue,
+		time.Duration(cfg.PenaltyDailyLimitDurationHours)*time.Hour,
+	)
+	reputationService := reputationApp.NewReputationService(reputationRepo, userService, userService, penaltyEvaluator)
+	spotService := spotsApp.NewSpotService(spotRepo, spotSpeciesRepo, appCache, cfg.DailySpotLimitDefault, userService, cfg.DuplicateSearchRadiusMeters, cfg.DuplicateSearchMaxResults, spotsDomain.ReputationConfig{
+		Recorder:      reputationService,
+		DeltaVerified: cfg.ReputationDeltaSpotVerified,
+		DeltaHidden:   cfg.ReputationDeltaSpotHidden,
+		DeltaDeleted:  cfg.ReputationDeltaSpotDeleted,
+	})
 	favService := usersApp.NewFavoriteService(favRepo, spotService)
 	authService := authApp.NewAuthService(googleValidator, userRepo, fbClient.Auth, cfg.JWTSecret, cfg.JWTExpiryMinutes, cfg.RegistrationEnabled)
 	speciesService := speciesApp.NewSpeciesService(speciesRepo, appCache)
 	commentService := commentsApp.NewCommentService(commentRepo, likeRepo, userInfoAdapter, spotRepo)
-	ratingService := ratingsApp.NewRatingService(ratingRepo, spotRepo)
+	ratingService := ratingsApp.NewRatingService(ratingRepo, spotRepo, reputationService, cfg.ReputationDeltaGoodRating, cfg.ReputationGoodRatingStarsThreshold)
 	searchService := searchApp.NewSearchService(spotRepo, speciesRepo, userRepo)
 	statsService := statsApp.NewStatsService(fbClient.Firestore, spotRepo, userRepo, appCache)
+	reportService := moderationApp.NewReportService(reportRepo, spotService, spotService, reputationService, cfg.ReportHideThreshold, cfg.ReputationDeltaSpotHidden)
 
 	// ========== HANDLERS ==========
 	authHandler := authIface.NewAuthHandler(authService)
@@ -107,6 +136,8 @@ func main() {
 	ratingHandler := ratingsIface.NewRatingHandler(ratingService)
 	searchHandler := searchIface.NewSearchHandler(searchService)
 	statsHandler := statsIface.NewStatsHandler(statsService)
+	reportHandler := moderationIface.NewReportHandler(reportService)
+	reputationHandler := reputationIface.NewReputationHandler(reputationService, penaltyEvaluator)
 
 	// ========== GIN ENGINE ==========
 	if cfg.Environment == "production" {
@@ -118,7 +149,8 @@ func main() {
 	authMw := middleware.NewAuthMiddleware(cfg)
 	rateLimiter := middleware.NewRateLimiter(appCache, cfg.RateLimitPerMin)
 
-	r.Use(gin.Logger())
+	r.Use(middleware.RequestID())
+	r.Use(middleware.AccessLogger())
 	r.Use(middleware.Recovery())
 	r.Use(middleware.ErrorHandler())
 	r.Use(middleware.CORSMiddleware(cfg.AllowedOrigins))
@@ -141,6 +173,8 @@ func main() {
 	ratingsIface.RegisterRoutes(v1, ratingHandler, authMw)
 	searchIface.RegisterRoutes(v1, searchHandler)
 	statsIface.RegisterRoutes(v1, statsHandler)
+	moderationIface.RegisterRoutes(v1, reportHandler, authMw)
+	reputationIface.RegisterRoutes(v1, reputationHandler, authMw)
 
 	// Start server
 	addr := fmt.Sprintf(":%s", cfg.Port)
@@ -149,4 +183,3 @@ func main() {
 		log.WithError(err).Fatal("Server failed to start")
 	}
 }
-

@@ -3,6 +3,7 @@ package infrastructure
 import (
 	"context"
 	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -61,57 +62,50 @@ func (r *SpotFirestoreRepository) List(ctx context.Context, limit, offset int, f
 	if err != nil {
 		return nil, 0, err
 	}
-	total := len(all)
 
-	// If geo filter, filter in memory
-	var spots []*domain.Spot
-	if filter.Latitude != nil && filter.Longitude != nil && filter.RadiusKm != nil {
-		for _, doc := range all {
-			var s domain.Spot
-			if err := doc.DataTo(&s); err != nil {
-				continue
-			}
-			s.ID = doc.Ref.ID
-			dist := haversine(s.Latitude, s.Longitude, *filter.Latitude, *filter.Longitude)
-			if dist <= *filter.RadiusKm {
-				spots = append(spots, &s)
-			}
-		}
-		total = len(spots)
-		// Apply pagination manually
-		end := offset + limit
-		if end > len(spots) {
-			end = len(spots)
-		}
-		if offset >= len(spots) {
-			return []*domain.Spot{}, total, nil
-		}
-		return spots[offset:end], total, nil
-	}
-
-	iter := query.Offset(offset).Limit(limit).Documents(ctx)
-	for {
-		doc, err := iter.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return nil, 0, err
-		}
+	// Firestore can't express "status not in (HIDDEN, DELETED)" alongside the
+	// other filters/legacy-empty-status case in a single query, so visibility
+	// and (optional) geo filtering are both applied in memory here.
+	var visible []*domain.Spot
+	for _, doc := range all {
 		var s domain.Spot
 		if err := doc.DataTo(&s); err != nil {
 			continue
 		}
 		s.ID = doc.Ref.ID
-		spots = append(spots, &s)
+		if !s.IsVisible() {
+			continue
+		}
+		visible = append(visible, &s)
 	}
-	return spots, total, nil
+
+	if filter.Latitude != nil && filter.Longitude != nil && filter.RadiusKm != nil {
+		var geoFiltered []*domain.Spot
+		for _, s := range visible {
+			dist := haversine(s.Latitude, s.Longitude, *filter.Latitude, *filter.Longitude)
+			if dist <= *filter.RadiusKm {
+				geoFiltered = append(geoFiltered, s)
+			}
+		}
+		visible = geoFiltered
+	}
+
+	total := len(visible)
+	end := offset + limit
+	if end > len(visible) {
+		end = len(visible)
+	}
+	if offset >= len(visible) {
+		return []*domain.Spot{}, total, nil
+	}
+	return visible[offset:end], total, nil
 }
 
 func (r *SpotFirestoreRepository) Create(ctx context.Context, spot *domain.Spot) (*domain.Spot, error) {
 	now := time.Now().UTC()
 	spot.CreatedAt = now
 	spot.UpdatedAt = now
+	spot.Status = string(domain.SpotStatusPending)
 
 	ref, _, err := r.client.Collection(r.collection).Add(ctx, map[string]interface{}{
 		"name":            spot.Name,
@@ -128,6 +122,8 @@ func (r *SpotFirestoreRepository) Create(ctx context.Context, spot *domain.Spot)
 		"averageRating":   0,
 		"totalRatings":    0,
 		"totalComments":   0,
+		"status":          spot.Status,
+		"reportCount":     0,
 		"createdAt":       spot.CreatedAt,
 		"updatedAt":       spot.UpdatedAt,
 	})
@@ -205,6 +201,9 @@ func (r *SpotFirestoreRepository) FindNearby(ctx context.Context, lat, lng, radi
 			continue
 		}
 		s.ID = doc.Ref.ID
+		if !s.IsVisible() {
+			continue
+		}
 		dist := haversine(s.Latitude, s.Longitude, lat, lng)
 		if dist <= radiusKm && dist > 0 {
 			spots = append(spots, &s)
@@ -214,6 +213,100 @@ func (r *SpotFirestoreRepository) FindNearby(ctx context.Context, lat, lng, radi
 		}
 	}
 	return spots, nil
+}
+
+func (r *SpotFirestoreRepository) UpdateStatus(ctx context.Context, id string, status domain.SpotStatus) (*domain.Spot, error) {
+	_, err := r.client.Collection(r.collection).Doc(id).Update(ctx, []firestore.Update{
+		{Path: "status", Value: string(status)},
+		{Path: "updatedAt", Value: time.Now().UTC()},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return r.FindByID(ctx, id)
+}
+
+// CountCreatedSince counts spots a user has created at or after the given
+// time. Requires a composite index on (createdByUserId ASC, createdAt ASC)
+// in Firestore — see FIRESTORE_COLLECTIONS.md.
+func (r *SpotFirestoreRepository) CountCreatedSince(ctx context.Context, userID string, since time.Time) (int, error) {
+	docs, err := r.client.Collection(r.collection).
+		Where("createdByUserId", "==", userID).
+		Where("createdAt", ">=", since).
+		Documents(ctx).GetAll()
+	if err != nil {
+		return 0, err
+	}
+	return len(docs), nil
+}
+
+// FindNearbyForDuplicateCheck finds visible spots within radiusMeters of the
+// given point, sorted by distance ascending, capped at maxResults. Used to
+// warn a user creating a spot that a very similar one may already exist.
+func (r *SpotFirestoreRepository) FindNearbyForDuplicateCheck(ctx context.Context, lat, lng, radiusMeters float64, maxResults int) ([]domain.DuplicateCandidate, error) {
+	iter := r.client.Collection(r.collection).Documents(ctx)
+	radiusKm := radiusMeters / 1000
+	var candidates []domain.DuplicateCandidate
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		var s domain.Spot
+		if err := doc.DataTo(&s); err != nil {
+			continue
+		}
+		s.ID = doc.Ref.ID
+		if !s.IsVisible() {
+			continue
+		}
+		distKm := haversine(s.Latitude, s.Longitude, lat, lng)
+		if distKm <= radiusKm {
+			candidates = append(candidates, domain.DuplicateCandidate{Spot: &s, DistanceMeters: distKm * 1000})
+		}
+	}
+
+	sort.Slice(candidates, func(i, j int) bool {
+		return candidates[i].DistanceMeters < candidates[j].DistanceMeters
+	})
+	if len(candidates) > maxResults {
+		candidates = candidates[:maxResults]
+	}
+	return candidates, nil
+}
+
+func (r *SpotFirestoreRepository) FindByCreatedByUserID(ctx context.Context, userID string, limit, offset int) ([]*domain.Spot, int, error) {
+	query := r.client.Collection(r.collection).
+		Where("createdByUserId", "==", userID).
+		OrderBy("createdAt", firestore.Desc)
+
+	all, err := query.Documents(ctx).GetAll()
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var spots []*domain.Spot
+	for _, doc := range all {
+		var s domain.Spot
+		if err := doc.DataTo(&s); err != nil {
+			continue
+		}
+		s.ID = doc.Ref.ID
+		spots = append(spots, &s)
+	}
+
+	total := len(spots)
+	end := offset + limit
+	if end > len(spots) {
+		end = len(spots)
+	}
+	if offset >= len(spots) {
+		return []*domain.Spot{}, total, nil
+	}
+	return spots[offset:end], total, nil
 }
 
 func (r *SpotFirestoreRepository) IncrementViews(ctx context.Context, id string) error {
@@ -275,4 +368,3 @@ func haversine(lat1, lon1, lat2, lon2 float64) float64 {
 	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
 	return R * c
 }
-

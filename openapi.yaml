@@ -105,6 +105,8 @@ components:
         updatedAt:
           type: string
           format: date-time
+        reputationScore:
+          type: integer
 
     UserPublic:
       type: object
@@ -246,6 +248,12 @@ components:
           type: integer
         totalComments:
           type: integer
+        status:
+          type: string
+          enum: [PENDING, VERIFIED, HIDDEN, DELETED]
+          description: Estado de moderación del spot. Los spots ocultos/eliminados no aparecen en listados públicos.
+        reportCount:
+          type: integer
         species:
           type: array
           items:
@@ -256,6 +264,93 @@ components:
         updatedAt:
           type: string
           format: date-time
+
+    SpotReport:
+      type: object
+      properties:
+        id:
+          type: string
+        spotId:
+          type: string
+        reporterUserId:
+          type: string
+        reason:
+          type: string
+          enum: [no_existe, ubicacion_incorrecta, informacion_falsa, duplicado, otro]
+        details:
+          type: string
+        status:
+          type: string
+          enum: [PENDING_REVIEW, VALID, REJECTED]
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateReportRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          enum: [no_existe, ubicacion_incorrecta, informacion_falsa, duplicado, otro]
+        details:
+          type: string
+          description: Requerido cuando reason es "otro"
+
+    ReputationEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        eventType:
+          type: string
+          enum: [SPOT_VERIFIED, SPOT_HIDDEN, SPOT_DELETED, GOOD_RATING_RECEIVED, REJECTED_CONTENT_PENALTY]
+        delta:
+          type: integer
+        relatedSpotId:
+          type: string
+        relatedReportId:
+          type: string
+        reason:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    Penalty:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        type:
+          type: string
+          enum: [DAILY_LIMIT_REDUCTION]
+        value:
+          type: integer
+        reason:
+          type: string
+        appliedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        revokedAt:
+          type: string
+          format: date-time
+
+    DuplicateCandidate:
+      type: object
+      properties:
+        spot:
+          $ref: '#/components/schemas/Spot'
+        distanceMeters:
+          type: number
+          format: double
 
     SpotSpecies:
       type: object
@@ -696,6 +791,96 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /users/{id}/reputation:
+    get:
+      tags: [Reputation]
+      summary: Obtener el resumen de reputación de un usuario (self o admin)
+      operationId: getUserReputation
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Puntaje actual y eventos recientes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  score:
+                    type: integer
+                  recentEvents:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ReputationEvent'
+        '403':
+          description: Solo el propio usuario o un admin pueden ver esta información
+
+  /users/{id}/reputation/history:
+    get:
+      tags: [Reputation]
+      summary: Historial completo de eventos de reputación (self o admin)
+      operationId: getUserReputationHistory
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Historial paginado, también sirve como auditoría
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ReputationEvent'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /users/{id}/penalties:
+    get:
+      tags: [Reputation]
+      summary: Listar penalizaciones de un usuario (self o admin)
+      operationId: getUserPenalties
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Penalizaciones activas y pasadas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Penalty'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
   /users/{id}/favorites:
     get:
       tags: [Favorites]
@@ -961,6 +1146,126 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Spot'
+        '409':
+          description: Ya existe un spot a menos de la distancia mínima permitida (ver DUPLICATE_SEARCH_RADIUS_METERS). Regla estricta, sin posibilidad de confirmar/omitir — hay que elegir otra ubicación.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        example: TOO_CLOSE_TO_EXISTING_SPOT
+                      message:
+                        type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DuplicateCandidate'
+        '429':
+          description: Límite diario de spots alcanzado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /spots/nearby-duplicates:
+    get:
+      tags: [Spots]
+      summary: Buscar posibles spots duplicados cerca de una coordenada
+      operationId: findNearbyDuplicateSpots
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: lng
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: radius
+          in: query
+          description: Radio en metros (opcional, acotado por el backend)
+          schema:
+            type: number
+      responses:
+        '200':
+          description: Candidatos a duplicado, ordenados por distancia
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DuplicateCandidate'
+
+  /spots/{id}/status:
+    patch:
+      tags: [Moderation]
+      summary: Cambiar el estado de moderación de un spot (solo admin)
+      operationId: updateSpotStatus
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [VERIFIED, HIDDEN, DELETED]
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Spot con el nuevo estado. PENDING→VERIFIED otorga reputación al dueño; HIDDEN/DELETED se la resta; restaurar un HIDDEN a VERIFIED no afecta la reputación.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Spot'
+
+  /spots/mine:
+    get:
+      tags: [Spots]
+      summary: Listar spots propios (sin filtrar por estado)
+      operationId: listMySpots
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Spots creados por el usuario autenticado, incluyendo PENDING/HIDDEN
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Spot'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
 
   /spots/{id}:
     get:
@@ -1206,6 +1511,72 @@ paths:
                     type: integer
                   liked:
                     type: boolean
+
+  /spots/{id}/reports:
+    post:
+      tags: [Moderation]
+      summary: Reportar un spot
+      operationId: reportSpot
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReportRequest'
+      responses:
+        '201':
+          description: Reporte creado. spotHidden indica si este reporte hizo que el spot pasara a HIDDEN.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  report:
+                    $ref: '#/components/schemas/SpotReport'
+                  spotHidden:
+                    type: boolean
+        '409':
+          description: El usuario ya había reportado este spot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    get:
+      tags: [Moderation]
+      summary: Listar reportes de un spot (solo admin)
+      operationId: listSpotReports
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Reportes del spot
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SpotReport'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
 
   /spots/{id}/ratings:
     get:

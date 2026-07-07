@@ -107,6 +107,21 @@ func (r *UserFirestoreRepository) Update(ctx context.Context, id string, req dom
 	return r.FindByID(ctx, id)
 }
 
+func (r *UserFirestoreRepository) IncrementReputationScore(ctx context.Context, id string, delta int) error {
+	_, err := r.client.Collection(r.collection).Doc(id).Update(ctx, []firestore.Update{
+		{Path: "reputationScore", Value: firestore.Increment(delta)},
+	})
+	return err
+}
+
+func (r *UserFirestoreRepository) SetDailySpotLimitOverride(ctx context.Context, id string, limit int, expiresAt time.Time) error {
+	_, err := r.client.Collection(r.collection).Doc(id).Update(ctx, []firestore.Update{
+		{Path: "dailySpotLimitOverride", Value: limit},
+		{Path: "dailySpotLimitOverrideExpiresAt", Value: expiresAt},
+	})
+	return err
+}
+
 func (r *UserFirestoreRepository) List(ctx context.Context, limit, offset int, search string) ([]*domain.UserPublic, int, error) {
 	query := r.client.Collection(r.collection).OrderBy("createdAt", firestore.Desc)
 
@@ -165,5 +180,3 @@ func (r *UserFirestoreRepository) countQuery(ctx context.Context, search string)
 	}
 	return len(results), nil
 }
-
-

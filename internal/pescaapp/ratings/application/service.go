@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/lriverd/big-service/internal/pescaapp/ratings/domain"
@@ -11,12 +12,27 @@ import (
 )
 
 type RatingService struct {
-	ratingRepo domain.RatingRepository
-	spotRepo   spotDomain.SpotRepository
+	ratingRepo                         domain.RatingRepository
+	spotRepo                           spotDomain.SpotRepository
+	reputationRecorder                 domain.ReputationRecorder
+	reputationDeltaGoodRating          int
+	reputationGoodRatingStarsThreshold int
 }
 
-func NewRatingService(ratingRepo domain.RatingRepository, spotRepo spotDomain.SpotRepository) *RatingService {
-	return &RatingService{ratingRepo: ratingRepo, spotRepo: spotRepo}
+func NewRatingService(
+	ratingRepo domain.RatingRepository,
+	spotRepo spotDomain.SpotRepository,
+	reputationRecorder domain.ReputationRecorder,
+	reputationDeltaGoodRating int,
+	reputationGoodRatingStarsThreshold int,
+) *RatingService {
+	return &RatingService{
+		ratingRepo:                         ratingRepo,
+		spotRepo:                           spotRepo,
+		reputationRecorder:                 reputationRecorder,
+		reputationDeltaGoodRating:          reputationDeltaGoodRating,
+		reputationGoodRatingStarsThreshold: reputationGoodRatingStarsThreshold,
+	}
 }
 
 func (s *RatingService) ListBySpot(ctx context.Context, spotID string, limit, offset int) ([]*domain.Rating, int, *domain.RatingStats, error) {
@@ -54,8 +70,31 @@ func (s *RatingService) CreateOrUpdate(ctx context.Context, spotID, userID strin
 		return nil, false, err
 	}
 	s.updateSpotRating(ctx, spotID)
+	s.rewardGoodRating(ctx, spotID, userID, stars)
 	log.WithFields(log.Fields{"spotId": spotID, "userId": userID, "stars": stars}).Info("Rating created")
 	return created, true, nil // true = created
+}
+
+// rewardGoodRating logs a reputation event for the spot's owner when a new
+// rating meets the configured "good rating" threshold. Ratings a spot's
+// owner leaves on their own spot are excluded, since otherwise self-rating
+// would be a free way to farm reputation.
+func (s *RatingService) rewardGoodRating(ctx context.Context, spotID, raterUserID string, stars int) {
+	if stars < s.reputationGoodRatingStarsThreshold {
+		return
+	}
+	spot, err := s.spotRepo.FindByID(ctx, spotID)
+	if err != nil {
+		log.WithError(err).WithField("spotId", spotID).Warn("Failed to look up spot owner for good-rating reputation event")
+		return
+	}
+	if spot.CreatedByUserID == raterUserID {
+		return
+	}
+	reason := fmt.Sprintf("Recibió una calificación de %d estrellas", stars)
+	if err := s.reputationRecorder.RecordReputationEvent(ctx, spot.CreatedByUserID, "GOOD_RATING_RECEIVED", s.reputationDeltaGoodRating, spotID, reason); err != nil {
+		log.WithError(err).WithField("spotId", spotID).Warn("Failed to record good-rating reputation event")
+	}
 }
 
 func (s *RatingService) Delete(ctx context.Context, spotID, userID string) error {
@@ -77,4 +116,3 @@ func (s *RatingService) updateSpotRating(ctx context.Context, spotID string) {
 	}
 	_ = s.spotRepo.UpdateRatingStats(ctx, spotID, stats.AverageRating, stats.TotalRatings)
 }
-

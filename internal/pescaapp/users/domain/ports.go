@@ -12,6 +12,8 @@ type UserRepository interface {
 	UpdateLastLoginAt(ctx context.Context, id string, t time.Time) error
 	List(ctx context.Context, limit, offset int, search string) ([]*UserPublic, int, error)
 	Count(ctx context.Context) (int, error)
+	IncrementReputationScore(ctx context.Context, id string, delta int) error
+	SetDailySpotLimitOverride(ctx context.Context, id string, limit int, expiresAt time.Time) error
 }
 
 type FavoriteRepository interface {
@@ -20,4 +22,3 @@ type FavoriteRepository interface {
 	Remove(ctx context.Context, userID, spotID string) error
 	Exists(ctx context.Context, userID, spotID string) (bool, error)
 }
-

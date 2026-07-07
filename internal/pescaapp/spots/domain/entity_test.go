@@ -45,6 +45,40 @@ func TestUpdateSpotRequest(t *testing.T) {
 	}
 }
 
+func TestSpotEffectiveStatusDefaultsToPendingForLegacyDocs(t *testing.T) {
+	spot := domain.Spot{ID: "s1"} // Status left unset, as in a pre-migration document.
+	if spot.EffectiveStatus() != domain.SpotStatusPending {
+		t.Errorf("expected legacy spot without status to default to PENDING, got %s", spot.EffectiveStatus())
+	}
+	if !spot.IsVisible() {
+		t.Error("expected a PENDING spot to remain visible")
+	}
+}
+
+func TestSpotEffectiveStatusRespectsExplicitValue(t *testing.T) {
+	spot := domain.Spot{ID: "s1", Status: string(domain.SpotStatusHidden)}
+	if spot.EffectiveStatus() != domain.SpotStatusHidden {
+		t.Errorf("expected explicit HIDDEN status to be respected, got %s", spot.EffectiveStatus())
+	}
+	if spot.IsVisible() {
+		t.Error("expected a HIDDEN spot to not be visible")
+	}
+}
+
+func TestSpotIsVisibleExcludesDeleted(t *testing.T) {
+	spot := domain.Spot{ID: "s1", Status: string(domain.SpotStatusDeleted)}
+	if spot.IsVisible() {
+		t.Error("expected a DELETED spot to not be visible")
+	}
+}
+
+func TestSpotIsVisibleIncludesVerified(t *testing.T) {
+	spot := domain.Spot{ID: "s1", Status: string(domain.SpotStatusVerified)}
+	if !spot.IsVisible() {
+		t.Error("expected a VERIFIED spot to be visible")
+	}
+}
+
 func TestSpotFilter(t *testing.T) {
 	lat := -33.0
 	radius := 10.0
@@ -57,4 +91,3 @@ func TestSpotFilter(t *testing.T) {
 		t.Error("unexpected filter fields")
 	}
 }
-

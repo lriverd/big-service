@@ -5,15 +5,16 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"context"
 	"github.com/gin-gonic/gin"
 	searchApp "github.com/lriverd/big-service/internal/pescaapp/search/application"
-	searchIface "github.com/lriverd/big-service/internal/pescaapp/search/interfaces"
 	"github.com/lriverd/big-service/internal/pescaapp/search/domain"
+	searchIface "github.com/lriverd/big-service/internal/pescaapp/search/interfaces"
 	speciesDomain "github.com/lriverd/big-service/internal/pescaapp/species/domain"
 	spotsDomain "github.com/lriverd/big-service/internal/pescaapp/spots/domain"
 	usersDomain "github.com/lriverd/big-service/internal/pescaapp/users/domain"
-	"context"
 )
 
 func init() { gin.SetMode(gin.TestMode) }
@@ -21,25 +22,59 @@ func init() { gin.SetMode(gin.TestMode) }
 // Mocks
 type mockSpotRepo struct{}
 
-func (m *mockSpotRepo) FindByID(ctx context.Context, id string) (*spotsDomain.Spot, error) { return nil, nil }
-func (m *mockSpotRepo) List(ctx context.Context, limit, offset int, filter spotsDomain.SpotFilter) ([]*spotsDomain.Spot, int, error) { return nil, 0, nil }
-func (m *mockSpotRepo) Create(ctx context.Context, spot *spotsDomain.Spot) (*spotsDomain.Spot, error) { return nil, nil }
-func (m *mockSpotRepo) Update(ctx context.Context, id string, req spotsDomain.UpdateSpotRequest) (*spotsDomain.Spot, error) { return nil, nil }
+func (m *mockSpotRepo) FindByID(ctx context.Context, id string) (*spotsDomain.Spot, error) {
+	return nil, nil
+}
+func (m *mockSpotRepo) List(ctx context.Context, limit, offset int, filter spotsDomain.SpotFilter) ([]*spotsDomain.Spot, int, error) {
+	return nil, 0, nil
+}
+func (m *mockSpotRepo) Create(ctx context.Context, spot *spotsDomain.Spot) (*spotsDomain.Spot, error) {
+	return nil, nil
+}
+func (m *mockSpotRepo) Update(ctx context.Context, id string, req spotsDomain.UpdateSpotRequest) (*spotsDomain.Spot, error) {
+	return nil, nil
+}
 func (m *mockSpotRepo) Delete(ctx context.Context, id string) error { return nil }
-func (m *mockSpotRepo) FindNearby(ctx context.Context, lat, lng, radiusKm float64, limit int) ([]*spotsDomain.Spot, error) { return nil, nil }
+func (m *mockSpotRepo) FindNearby(ctx context.Context, lat, lng, radiusKm float64, limit int) ([]*spotsDomain.Spot, error) {
+	return nil, nil
+}
 func (m *mockSpotRepo) IncrementViews(ctx context.Context, id string) error { return nil }
-func (m *mockSpotRepo) UpdateRatingStats(ctx context.Context, id string, avgRating float64, totalRatings int) error { return nil }
-func (m *mockSpotRepo) UpdateCommentCount(ctx context.Context, id string, delta int) error { return nil }
+func (m *mockSpotRepo) UpdateRatingStats(ctx context.Context, id string, avgRating float64, totalRatings int) error {
+	return nil
+}
+func (m *mockSpotRepo) UpdateCommentCount(ctx context.Context, id string, delta int) error {
+	return nil
+}
 func (m *mockSpotRepo) Search(ctx context.Context, query string, limit int) ([]*spotsDomain.Spot, error) {
 	return []*spotsDomain.Spot{{ID: "s1", Name: "Test Spot", Region: "Test Region", AverageRating: 4.5}}, nil
+}
+func (m *mockSpotRepo) UpdateStatus(ctx context.Context, id string, status spotsDomain.SpotStatus) (*spotsDomain.Spot, error) {
+	return nil, nil
+}
+func (m *mockSpotRepo) FindByCreatedByUserID(ctx context.Context, userID string, limit, offset int) ([]*spotsDomain.Spot, int, error) {
+	return nil, 0, nil
+}
+func (m *mockSpotRepo) CountCreatedSince(ctx context.Context, userID string, since time.Time) (int, error) {
+	return 0, nil
+}
+func (m *mockSpotRepo) FindNearbyForDuplicateCheck(ctx context.Context, lat, lng, radiusMeters float64, maxResults int) ([]spotsDomain.DuplicateCandidate, error) {
+	return nil, nil
 }
 
 type mockSpeciesRepo struct{}
 
-func (m *mockSpeciesRepo) FindByID(ctx context.Context, id string) (*speciesDomain.Species, error) { return nil, nil }
-func (m *mockSpeciesRepo) List(ctx context.Context, limit, offset int, search string) ([]*speciesDomain.Species, int, error) { return nil, 0, nil }
-func (m *mockSpeciesRepo) Create(ctx context.Context, sp *speciesDomain.Species) (*speciesDomain.Species, error) { return nil, nil }
-func (m *mockSpeciesRepo) Update(ctx context.Context, id string, req speciesDomain.UpdateSpeciesRequest) (*speciesDomain.Species, error) { return nil, nil }
+func (m *mockSpeciesRepo) FindByID(ctx context.Context, id string) (*speciesDomain.Species, error) {
+	return nil, nil
+}
+func (m *mockSpeciesRepo) List(ctx context.Context, limit, offset int, search string) ([]*speciesDomain.Species, int, error) {
+	return nil, 0, nil
+}
+func (m *mockSpeciesRepo) Create(ctx context.Context, sp *speciesDomain.Species) (*speciesDomain.Species, error) {
+	return nil, nil
+}
+func (m *mockSpeciesRepo) Update(ctx context.Context, id string, req speciesDomain.UpdateSpeciesRequest) (*speciesDomain.Species, error) {
+	return nil, nil
+}
 func (m *mockSpeciesRepo) Delete(ctx context.Context, id string) error { return nil }
 func (m *mockSpeciesRepo) Search(ctx context.Context, query string, limit int) ([]*speciesDomain.Species, error) {
 	return []*speciesDomain.Species{{ID: "sp1", CommonName: "Trucha", ScientificName: "Oncorhynchus"}}, nil
@@ -47,14 +82,28 @@ func (m *mockSpeciesRepo) Search(ctx context.Context, query string, limit int) (
 
 type mockUserRepo struct{}
 
-func (m *mockUserRepo) FindByID(ctx context.Context, id string) (*usersDomain.User, error) { return nil, nil }
-func (m *mockUserRepo) FindByEmail(ctx context.Context, email string) (*usersDomain.User, error) { return nil, nil }
-func (m *mockUserRepo) Create(ctx context.Context, user *usersDomain.User) (*usersDomain.User, error) { return nil, nil }
-func (m *mockUserRepo) Update(ctx context.Context, id string, req usersDomain.UpdateUserRequest) (*usersDomain.User, error) { return nil, nil }
+func (m *mockUserRepo) FindByID(ctx context.Context, id string) (*usersDomain.User, error) {
+	return nil, nil
+}
+func (m *mockUserRepo) FindByEmail(ctx context.Context, email string) (*usersDomain.User, error) {
+	return nil, nil
+}
+func (m *mockUserRepo) Create(ctx context.Context, user *usersDomain.User) (*usersDomain.User, error) {
+	return nil, nil
+}
+func (m *mockUserRepo) Update(ctx context.Context, id string, req usersDomain.UpdateUserRequest) (*usersDomain.User, error) {
+	return nil, nil
+}
 func (m *mockUserRepo) List(ctx context.Context, limit, offset int, search string) ([]*usersDomain.UserPublic, int, error) {
 	return []*usersDomain.UserPublic{{ID: "u1", Name: "Test User"}}, 1, nil
 }
 func (m *mockUserRepo) Count(ctx context.Context) (int, error) { return 0, nil }
+func (m *mockUserRepo) IncrementReputationScore(ctx context.Context, id string, delta int) error {
+	return nil
+}
+func (m *mockUserRepo) SetDailySpotLimitOverride(ctx context.Context, id string, limit int, expiresAt time.Time) error {
+	return nil
+}
 
 func setupSearchRouter() *gin.Engine {
 	svc := searchApp.NewSearchService(&mockSpotRepo{}, &mockSpeciesRepo{}, &mockUserRepo{})
@@ -168,4 +217,3 @@ func TestSearchResult_Empty(t *testing.T) {
 		t.Error("expected empty result")
 	}
 }
-
