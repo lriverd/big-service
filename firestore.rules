@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      // Todo el acceso pasa por el backend con service account (ver
+      // FIRESTORE_COLLECTIONS.md); el cliente nunca habla directo con Firestore.
+      allow read, write: if false;
+    }
+  }
+}
