@@ -27,7 +27,7 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 			response.Error(c, appErr.Status, appErr.Code, appErr.Message)
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get user")
+		response.InternalError(c, err, "Failed to get user")
 		return
 	}
 	response.Success(c, user)
@@ -52,7 +52,7 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 
 	user, err := h.service.UpdateUser(c.Request.Context(), id, req)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update user")
+		response.InternalError(c, err, "Failed to update user")
 		return
 	}
 	response.Success(c, user)
@@ -64,9 +64,8 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 
 	users, total, err := h.service.ListUsers(c.Request.Context(), p.Limit, p.Offset, search)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list users")
+		response.InternalError(c, err, "Failed to list users")
 		return
 	}
 	response.Paginated(c, users, total, p.Limit, p.Offset)
 }
-

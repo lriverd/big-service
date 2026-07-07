@@ -33,9 +33,8 @@ func (h *SearchHandler) Search(c *gin.Context) {
 
 	result, err := h.service.Search(c.Request.Context(), q, searchType, limit)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Search failed")
+		response.InternalError(c, err, "Search failed")
 		return
 	}
 	response.Success(c, gin.H{"results": result})
 }
-

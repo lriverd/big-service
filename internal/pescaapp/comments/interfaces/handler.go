@@ -9,7 +9,6 @@ import (
 	apperrors "github.com/lriverd/big-service/internal/shared/errors"
 	"github.com/lriverd/big-service/internal/shared/pagination"
 	"github.com/lriverd/big-service/internal/shared/response"
-	log "github.com/sirupsen/logrus"
 )
 
 type CommentHandler struct {
@@ -32,8 +31,7 @@ func (h *CommentHandler) ListBySpot(c *gin.Context) {
 
 	comments, total, err := h.service.ListBySpot(c.Request.Context(), spotID, p.Limit, p.Offset, sortBy, uid)
 	if err != nil {
-		log.WithError(err).WithField("spotId", spotID).Error("Failed to list comments")
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list comments")
+		response.InternalError(c, err, "Failed to list comments")
 		return
 	}
 	response.Paginated(c, comments, total, p.Limit, p.Offset)
@@ -49,8 +47,7 @@ func (h *CommentHandler) Create(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	comment, err := h.service.Create(c.Request.Context(), spotID, userID.(string), req.Text)
 	if err != nil {
-		log.WithError(err).WithField("spotId", spotID).Error("Failed to create comment")
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create comment")
+		response.InternalError(c, err, "Failed to create comment")
 		return
 	}
 	response.Created(c, comment)
@@ -70,7 +67,7 @@ func (h *CommentHandler) Update(c *gin.Context) {
 			response.Error(c, appErr.Status, appErr.Code, appErr.Message)
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update comment")
+		response.InternalError(c, err, "Failed to update comment")
 		return
 	}
 	response.Success(c, comment)
@@ -85,7 +82,7 @@ func (h *CommentHandler) Delete(c *gin.Context) {
 			response.Error(c, appErr.Status, appErr.Code, appErr.Message)
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete comment")
+		response.InternalError(c, err, "Failed to delete comment")
 		return
 	}
 	response.NoContent(c)
@@ -100,7 +97,7 @@ func (h *CommentHandler) Like(c *gin.Context) {
 			response.Error(c, appErr.Status, appErr.Code, appErr.Message)
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to like comment")
+		response.InternalError(c, err, "Failed to like comment")
 		return
 	}
 	response.Success(c, gin.H{"likes": likes, "liked": liked})
@@ -115,9 +112,8 @@ func (h *CommentHandler) Unlike(c *gin.Context) {
 			response.Error(c, appErr.Status, appErr.Code, appErr.Message)
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to unlike comment")
+		response.InternalError(c, err, "Failed to unlike comment")
 		return
 	}
 	response.Success(c, gin.H{"likes": likes, "liked": liked})
 }
-

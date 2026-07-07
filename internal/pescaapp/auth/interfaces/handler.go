@@ -66,7 +66,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 			response.Error(c, appErr.Status, appErr.Code, appErr.Message)
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Registration failed")
+		response.InternalError(c, err, "Registration failed")
 		return
 	}
 
@@ -76,9 +76,8 @@ func (h *AuthHandler) Register(c *gin.Context) {
 func (h *AuthHandler) Logout(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	if err := h.service.Logout(c.Request.Context(), userID.(string)); err != nil {
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Logout failed")
+		response.InternalError(c, err, "Logout failed")
 		return
 	}
 	response.Success(c, gin.H{"message": "Logged out successfully"})
 }
-

@@ -25,7 +25,7 @@ func (h *RatingHandler) ListBySpot(c *gin.Context) {
 
 	ratings, total, stats, err := h.service.ListBySpot(c.Request.Context(), spotID, p.Limit, p.Offset)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list ratings")
+		response.InternalError(c, err, "Failed to list ratings")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
@@ -50,7 +50,7 @@ func (h *RatingHandler) CreateOrUpdate(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	rating, created, err := h.service.CreateOrUpdate(c.Request.Context(), spotID, userID.(string), req.Stars)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create rating")
+		response.InternalError(c, err, "Failed to create rating")
 		return
 	}
 	if created {
@@ -68,9 +68,8 @@ func (h *RatingHandler) Delete(c *gin.Context) {
 			response.Error(c, appErr.Status, appErr.Code, appErr.Message)
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete rating")
+		response.InternalError(c, err, "Failed to delete rating")
 		return
 	}
 	response.NoContent(c)
 }
-

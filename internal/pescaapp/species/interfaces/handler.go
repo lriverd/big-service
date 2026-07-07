@@ -25,7 +25,7 @@ func (h *SpeciesHandler) List(c *gin.Context) {
 
 	species, total, err := h.service.List(c.Request.Context(), p.Limit, p.Offset, search)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list species")
+		response.InternalError(c, err, "Failed to list species")
 		return
 	}
 	response.Paginated(c, species, total, p.Limit, p.Offset)
@@ -39,7 +39,7 @@ func (h *SpeciesHandler) GetByID(c *gin.Context) {
 			response.Error(c, appErr.Status, appErr.Code, appErr.Message)
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get species")
+		response.InternalError(c, err, "Failed to get species")
 		return
 	}
 	response.Success(c, sp)
@@ -53,7 +53,7 @@ func (h *SpeciesHandler) Create(c *gin.Context) {
 	}
 	sp, err := h.service.Create(c.Request.Context(), req)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create species")
+		response.InternalError(c, err, "Failed to create species")
 		return
 	}
 	response.Created(c, sp)
@@ -68,7 +68,7 @@ func (h *SpeciesHandler) Update(c *gin.Context) {
 	}
 	sp, err := h.service.Update(c.Request.Context(), id, req)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to update species")
+		response.InternalError(c, err, "Failed to update species")
 		return
 	}
 	response.Success(c, sp)
@@ -77,9 +77,8 @@ func (h *SpeciesHandler) Update(c *gin.Context) {
 func (h *SpeciesHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
 	if err := h.service.Delete(c.Request.Context(), id); err != nil {
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to delete species")
+		response.InternalError(c, err, "Failed to delete species")
 		return
 	}
 	response.NoContent(c)
 }
-

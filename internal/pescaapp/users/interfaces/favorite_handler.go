@@ -24,7 +24,7 @@ func (h *FavoriteHandler) ListFavorites(c *gin.Context) {
 
 	favs, total, err := h.service.ListFavorites(c.Request.Context(), userID, p.Limit, p.Offset)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list favorites")
+		response.InternalError(c, err, "Failed to list favorites")
 		return
 	}
 	response.Paginated(c, favs, total, p.Limit, p.Offset)
@@ -61,7 +61,7 @@ func (h *FavoriteHandler) RemoveFavorite(c *gin.Context) {
 	}
 
 	if err := h.service.RemoveFavorite(c.Request.Context(), userID, spotID); err != nil {
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to remove favorite")
+		response.InternalError(c, err, "Failed to remove favorite")
 		return
 	}
 	response.NoContent(c)

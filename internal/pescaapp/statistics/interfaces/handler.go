@@ -1,7 +1,6 @@
 package interfaces
 
 import (
-	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -26,7 +25,7 @@ func (h *StatsHandler) GetSpotStats(c *gin.Context) {
 			response.Error(c, appErr.Status, appErr.Code, appErr.Message)
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get spot stats")
+		response.InternalError(c, err, "Failed to get spot stats")
 		return
 	}
 	response.Success(c, stats)
@@ -40,7 +39,7 @@ func (h *StatsHandler) GetUserStats(c *gin.Context) {
 			response.Error(c, appErr.Status, appErr.Code, appErr.Message)
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get user stats")
+		response.InternalError(c, err, "Failed to get user stats")
 		return
 	}
 	response.Success(c, stats)
@@ -57,9 +56,8 @@ func (h *StatsHandler) GetPopularSpots(c *gin.Context) {
 
 	spots, err := h.service.GetPopularSpots(c.Request.Context(), limit, orderBy)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to get popular spots")
+		response.InternalError(c, err, "Failed to get popular spots")
 		return
 	}
 	response.Success(c, gin.H{"data": spots})
 }
-

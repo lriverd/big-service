@@ -1,12 +1,17 @@
 package response_test
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/lriverd/big-service/internal/shared/response"
 )
 
@@ -112,6 +117,47 @@ func TestError(t *testing.T) {
 	}
 }
 
+func TestInternalError_LogsRealErrorAndRespondsGenerically(t *testing.T) {
+	var logBuf bytes.Buffer
+	origOut := log.StandardLogger().Out
+	log.SetOutput(&logBuf)
+	defer log.SetOutput(origOut)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/spots", nil)
+	c.Set("requestId", "req-test-123")
+
+	underlying := errors.New("firestore: deadline exceeded")
+	response.InternalError(c, underlying, "Failed to create spot")
+
+	// The client only ever sees the generic envelope, never the raw error.
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500, got %d", w.Code)
+	}
+	var body map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &body)
+	errObj := body["error"].(map[string]interface{})
+	if errObj["code"] != "INTERNAL_ERROR" {
+		t.Errorf("expected INTERNAL_ERROR code, got %v", errObj["code"])
+	}
+	if strings.Contains(w.Body.String(), "deadline exceeded") {
+		t.Error("the real error must not leak into the HTTP response")
+	}
+
+	// But the log must have everything needed to actually debug it.
+	logged := logBuf.String()
+	if !strings.Contains(logged, "deadline exceeded") {
+		t.Errorf("expected the real error in the log, got: %s", logged)
+	}
+	if !strings.Contains(logged, "req-test-123") {
+		t.Errorf("expected the request ID in the log for correlation, got: %s", logged)
+	}
+	if !strings.Contains(logged, "/v1/spots") {
+		t.Errorf("expected the request path in the log, got: %s", logged)
+	}
+}
+
 func TestErrorWithDetails(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -125,6 +171,3 @@ func TestErrorWithDetails(t *testing.T) {
 		t.Errorf("expected details")
 	}
 }
-
-
-
